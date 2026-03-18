@@ -1,6 +1,7 @@
 package com.musinsa.payment.point.service;
 
 import com.musinsa.payment.common.exception.BusinessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.musinsa.payment.common.exception.Result;
 import com.musinsa.payment.point.dto.PointEarnRequest;
 import com.musinsa.payment.point.dto.PointEarnResponse;
@@ -96,9 +97,16 @@ public class PointService {
 
 	private PointWallet getOrCreateWalletWithLock(Long memberId) {
 		return pointWalletRepository.findByMemberIdWithLock(memberId)
-				.orElseGet(() -> pointWalletRepository.save(
-						PointWallet.builder().memberId(memberId).build()
-				));
+				.orElseGet(() -> {
+					try {
+						return pointWalletRepository.save(
+								PointWallet.builder().memberId(memberId).build()
+						);
+					} catch (DataIntegrityViolationException e) {
+						log.warn("지갑 동시 생성 감지 - memberId: {}", memberId);
+						throw new BusinessException(Result.DUPLICATE_REQUEST);
+					}
+				});
 	}
 
 	private String generatePointKey() {

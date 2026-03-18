@@ -1,6 +1,8 @@
 package com.musinsa.payment.point.entity;
 
 import com.musinsa.payment.common.entity.BaseEntity;
+import com.musinsa.payment.common.exception.BusinessException;
+import com.musinsa.payment.common.exception.Result;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -57,10 +59,16 @@ public class PointEarn extends BaseEntity {
 	}
 
 	public void use(Long amount) {
+		if (this.remainingAmount < amount) {
+			throw new BusinessException(Result.INSUFFICIENT_POINT);
+		}
 		this.remainingAmount -= amount;
 	}
 
 	public void restore(Long amount) {
+		if (this.remainingAmount + amount > this.earnedAmount) {
+			throw new BusinessException(Result.INVALID_CANCEL_AMOUNT);
+		}
 		this.remainingAmount += amount;
 	}
 

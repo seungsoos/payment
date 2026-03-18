@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS point_wallet (
 );
 
 -- 포인트 적립건 테이블
-CREATE TABLE IF NOT EXISTS point (
+CREATE TABLE IF NOT EXISTS point_earn (
     id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
     wallet_id           BIGINT          NOT NULL,
     point_key           VARCHAR(50)     NOT NULL UNIQUE,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS point (
     status              VARCHAR(20)     NOT NULL,
     created_at          TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_point_wallet FOREIGN KEY (wallet_id) REFERENCES point_wallet(id)
+    CONSTRAINT fk_point_earn_wallet FOREIGN KEY (wallet_id) REFERENCES point_wallet(id)
 );
 
 -- 포인트 거래 이력 테이블
@@ -54,12 +54,12 @@ CREATE TABLE IF NOT EXISTS point_usage (
     amount              BIGINT          NOT NULL,
     created_at          TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_usage_transaction FOREIGN KEY (transaction_id) REFERENCES point_transaction(id),
-    CONSTRAINT fk_usage_point FOREIGN KEY (point_id) REFERENCES point(id)
+    CONSTRAINT fk_usage_point FOREIGN KEY (point_id) REFERENCES point_earn(id)
 );
 
 -- 인덱스
-CREATE INDEX IF NOT EXISTS idx_point_wallet_id ON point(wallet_id);
-CREATE INDEX IF NOT EXISTS idx_point_status_expires ON point(status, expires_at);
+CREATE INDEX IF NOT EXISTS idx_point_earn_wallet_id ON point_earn(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_point_earn_status_expires ON point_earn(status, expires_at);
 CREATE INDEX IF NOT EXISTS idx_transaction_wallet_id ON point_transaction(wallet_id);
 CREATE INDEX IF NOT EXISTS idx_transaction_related_key ON point_transaction(related_point_key);
 CREATE INDEX IF NOT EXISTS idx_usage_transaction_id ON point_usage(transaction_id);

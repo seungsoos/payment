@@ -9,11 +9,14 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/**
+ * 포인트 적립건 - 개별 적립 단위로 잔액을 관리하며 1원 단위 사용 추적의 기준
+ */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
-@Table(name = "point")
-public class Point extends BaseEntity {
+@Table(name = "point_earn")
+public class PointEarn extends BaseEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,7 +46,7 @@ public class Point extends BaseEntity {
 	private PointStatus status;
 
 	@Builder
-	public Point(Long walletId, String pointKey, Long earnedAmount, EarnType earnType, LocalDateTime expiresAt) {
+	public PointEarn(Long walletId, String pointKey, Long earnedAmount, EarnType earnType, LocalDateTime expiresAt) {
 		this.walletId = walletId;
 		this.pointKey = pointKey;
 		this.earnedAmount = earnedAmount;

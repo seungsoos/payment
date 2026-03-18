@@ -9,6 +9,13 @@ spring:
     hibernate:
       ddl-auto: none
     show-sql: true
+    defer-datasource-initialization: true
     properties:
       hibernate:
         format_sql: true
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/ddl.sql
+      data-locations: classpath:db/dml.sql

@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: payment
+
+  datasource:
+    url: jdbc:h2:mem:payment;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+logging:
+  level:
+    com.musinsa.payment: DEBUG
+    org.hibernate.SQL: DEBUG

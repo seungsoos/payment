@@ -24,7 +24,7 @@ public enum Result {
 	MEMBER_NOT_FOUND("MEMBER_NOT_FOUND", "회원을 찾을 수 없습니다"),
 
 	// 시스템
-	DUPLICATE_REQUEST("DUPLICATE_REQUEST", "이미 처리 중인 요청입니다"),
+	DUPLICATE_REQUEST("DUPLICATE_REQUEST", "이미 처리된 요청입니다"),
 	BAD_REQUEST("BAD_REQUEST", "잘못된 요청입니다"),
 	INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", "내부 서버 오류가 발생했습니다");
 

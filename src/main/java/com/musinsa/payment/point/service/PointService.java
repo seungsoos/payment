@@ -37,6 +37,7 @@ public class PointService {
 
 		// 지갑 조회 (없으면 생성) + 락
 		PointWallet wallet = getOrCreateWalletWithLock(request.memberId());
+		checkIdempotencyAfterLock(request.idempotencyKey());
 		pointValidator.validateMaxHoldAmount(wallet, request.amount());
 
 		// 적립 처리
@@ -58,9 +59,7 @@ public class PointService {
 
 		// 적립건 조회 + 소유자 검증
 		PointEarn point = getPointEarn(request.pointKey());
-		if (!wallet.getId().equals(point.getWalletId())) {
-			throw new BusinessException(Result.POINT_NOT_FOUND);
-		}
+		pointValidator.validateOwner(wallet, point);
 
 		// 이미 취소된 경우 기존 결과 반환 (pointKey 기반 멱등성)
 		if (PointStatus.CANCELLED == point.getStatus()) {
@@ -83,6 +82,7 @@ public class PointService {
 	public PointUseResponse use(PointUseRequest request) {
 		// 지갑 조회 + 락
 		PointWallet wallet = getWalletWithLock(request.memberId());
+		checkIdempotencyAfterLock(request.idempotencyKey());
 
 		// 거래 이력 생성
 		String pointKey = generatePointKey();
@@ -106,6 +106,7 @@ public class PointService {
 	public PointUseCancelResponse useCancel(PointUseCancelRequest request) {
 		// 지갑 조회 + 락
 		PointWallet wallet = getWalletWithLock(request.memberId());
+		checkIdempotencyAfterLock(request.idempotencyKey());
 
 		// 원래 사용 거래 조회
 		PointTransaction useTransaction = pointTransactionRepository.findByPointKey(request.pointKey())
@@ -196,6 +197,12 @@ public class PointService {
 
 		if (remainingAmount > 0) {
 			throw new BusinessException(Result.INSUFFICIENT_POINT);
+		}
+	}
+
+	private void checkIdempotencyAfterLock(String idempotencyKey) {
+		if (pointTransactionRepository.findByIdempotencyKey(idempotencyKey).isPresent()) {
+			throw new BusinessException(Result.DUPLICATE_REQUEST);
 		}
 	}
 

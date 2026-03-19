@@ -35,6 +35,12 @@ public class PointValidator {
 		}
 	}
 
+	public void validateOwner(PointWallet wallet, PointEarn point) {
+		if (!wallet.getId().equals(point.getWalletId())) {
+			throw new BusinessException(Result.POINT_NOT_FOUND);
+		}
+	}
+
 	private Long getPolicyValue(PolicyKey policyKey) {
 		return pointPolicyRepository.findByPolicyKey(policyKey)
 				.map(PointPolicy::getPolicyValue)

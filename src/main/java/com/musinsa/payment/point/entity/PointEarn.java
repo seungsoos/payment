@@ -73,6 +73,9 @@ public class PointEarn extends BaseEntity {
 	}
 
 	public void cancel() {
+		if (this.remainingAmount < this.earnedAmount) {
+			throw new BusinessException(Result.POINT_ALREADY_USED);
+		}
 		this.status = PointStatus.CANCELLED;
 		this.remainingAmount = 0L;
 	}
@@ -83,9 +86,5 @@ public class PointEarn extends BaseEntity {
 
 	public boolean isUsable() {
 		return this.status == PointStatus.ACTIVE && !isExpired() && this.remainingAmount > 0;
-	}
-
-	public boolean hasBeenUsed() {
-		return this.remainingAmount < this.earnedAmount;
 	}
 }

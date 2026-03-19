@@ -35,12 +35,6 @@ public class PointValidator {
 		}
 	}
 
-	public void validateEarnCancellable(PointEarn point) {
-		if (point.hasBeenUsed()) {
-			throw new BusinessException(Result.POINT_ALREADY_USED);
-		}
-	}
-
 	private Long getPolicyValue(PolicyKey policyKey) {
 		return pointPolicyRepository.findByPolicyKey(policyKey)
 				.map(PointPolicy::getPolicyValue)

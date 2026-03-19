@@ -43,7 +43,7 @@ public class PointService {
 		String pointKey = generatePointKey();
 		PointEarn point = createPoint(wallet, pointKey, request);
 		wallet.addBalance(request.amount());
-		createEarnTransaction(wallet, pointKey, request);
+		createTransaction(wallet.getId(), pointKey, TransactionType.EARN, request.amount(), null, null, request.idempotencyKey());
 
 		log.info("포인트 적립 완료 - memberId: {}, pointKey: {}, amount: {}, balance: {}",
 				request.memberId(), pointKey, request.amount(), wallet.getTotalBalance());
@@ -67,7 +67,7 @@ public class PointService {
 		// 적립취소 처리
 		wallet.deductBalance(point.getEarnedAmount());
 		point.cancel();
-		createEarnCancelTransaction(wallet, point, request);
+		createTransaction(wallet.getId(), generatePointKey(), TransactionType.EARN_CANCEL, point.getEarnedAmount(), null, request.pointKey(), null);
 
 		log.info("포인트 적립취소 완료 - memberId: {}, pointKey: {}, amount: {}, balance: {}",
 				request.memberId(), request.pointKey(), point.getEarnedAmount(), wallet.getTotalBalance());
@@ -83,7 +83,7 @@ public class PointService {
 
 		// 거래 이력 생성
 		String pointKey = generatePointKey();
-		PointTransaction transaction = createUseTransaction(wallet, pointKey, request);
+		PointTransaction transaction = createTransaction(wallet.getId(), pointKey, TransactionType.USE, request.amount(), request.orderId(), null, request.idempotencyKey());
 
 		// 적립건별 차감 + 사용-적립 매핑 생성
 		deductFromEarnPoints(wallet, transaction, request.amount());
@@ -117,15 +117,8 @@ public class PointService {
 
 		// 거래 이력 생성
 		String pointKey = generatePointKey();
-		PointTransaction cancelTransaction = pointTransactionRepository.save(PointTransaction.builder()
-				.walletId(wallet.getId())
-				.pointKey(pointKey)
-				.type(TransactionType.USE_CANCEL)
-				.amount(request.cancelAmount())
-				.orderId(useTransaction.getOrderId())
-				.relatedPointKey(request.pointKey())
-				.idempotencyKey(request.idempotencyKey())
-				.build());
+		PointTransaction cancelTransaction = createTransaction(wallet.getId(), pointKey, TransactionType.USE_CANCEL,
+				request.cancelAmount(), useTransaction.getOrderId(), request.pointKey(), request.idempotencyKey());
 
 		// 사용-적립 매핑 기반으로 복원 처리
 		restoreEarnPoints(wallet, useTransaction, request.cancelAmount());
@@ -161,12 +154,7 @@ public class PointService {
 						.expiresAt(LocalDateTime.now().plusDays(365))
 						.build());
 
-				pointTransactionRepository.save(PointTransaction.builder()
-						.walletId(wallet.getId())
-						.pointKey(newPoint.getPointKey())
-						.type(TransactionType.EARN)
-						.amount(restoreAmount)
-						.build());
+				createTransaction(wallet.getId(), newPoint.getPointKey(), TransactionType.EARN, restoreAmount, null, null, null);
 			} else {
 				// 유효한 적립건은 잔액 복원
 				point.restore(restoreAmount);
@@ -181,17 +169,6 @@ public class PointService {
 				.stream()
 				.mapToLong(PointTransaction::getAmount)
 				.sum();
-	}
-
-	private PointTransaction createUseTransaction(PointWallet wallet, String pointKey, PointUseRequest request) {
-		return pointTransactionRepository.save(PointTransaction.builder()
-				.walletId(wallet.getId())
-				.pointKey(pointKey)
-				.type(TransactionType.USE)
-				.amount(request.amount())
-				.orderId(request.orderId())
-				.idempotencyKey(request.idempotencyKey())
-				.build());
 	}
 
 	private void deductFromEarnPoints(PointWallet wallet, PointTransaction transaction, Long amount) {
@@ -223,16 +200,6 @@ public class PointService {
 				.orElseThrow(() -> new BusinessException(Result.POINT_NOT_FOUND));
 	}
 
-	private void createEarnCancelTransaction(PointWallet wallet, PointEarn point, PointEarnCancelRequest request) {
-		pointTransactionRepository.save(PointTransaction.builder()
-				.walletId(wallet.getId())
-				.pointKey(generatePointKey())
-				.type(TransactionType.EARN_CANCEL)
-				.amount(point.getEarnedAmount())
-				.relatedPointKey(request.pointKey())
-				.build());
-	}
-
 	private PointEarn createPoint(PointWallet wallet, String pointKey, PointEarnRequest request) {
 		return pointEarnRepository.save(getPointEarn(wallet, pointKey, request));
 	}
@@ -247,18 +214,17 @@ public class PointService {
 				.build();
 	}
 
-	private void createEarnTransaction(PointWallet wallet, String pointKey, PointEarnRequest request) {
-		pointTransactionRepository.save(getTransaction(wallet, pointKey, request));
-	}
-
-	private PointTransaction getTransaction(PointWallet wallet, String pointKey, PointEarnRequest request) {
-		return PointTransaction.builder()
-				.walletId(wallet.getId())
+	private PointTransaction createTransaction(Long walletId, String pointKey, TransactionType type,
+											   Long amount, String orderId, String relatedPointKey, String idempotencyKey) {
+		return pointTransactionRepository.save(PointTransaction.builder()
+				.walletId(walletId)
 				.pointKey(pointKey)
-				.type(TransactionType.EARN)
-				.amount(request.amount())
-				.idempotencyKey(request.idempotencyKey())
-				.build();
+				.type(type)
+				.amount(amount)
+				.orderId(orderId)
+				.relatedPointKey(relatedPointKey)
+				.idempotencyKey(idempotencyKey)
+				.build());
 	}
 
 	private PointWallet getOrCreateWalletWithLock(Long memberId) {

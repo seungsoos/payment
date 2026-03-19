@@ -56,8 +56,11 @@ public class PointService {
 		// 지갑 조회 + 락 (동시성 제어를 위해 먼저 락 획득)
 		PointWallet wallet = getWalletWithLock(request.memberId());
 
-		// 적립건 조회
+		// 적립건 조회 + 소유자 검증
 		PointEarn point = getPointEarn(request.pointKey());
+		if (!wallet.getId().equals(point.getWalletId())) {
+			throw new BusinessException(Result.POINT_NOT_FOUND);
+		}
 
 		// 이미 취소된 경우 기존 결과 반환 (pointKey 기반 멱등성)
 		if (PointStatus.CANCELLED == point.getStatus()) {
@@ -139,8 +142,9 @@ public class PointService {
 		Long remainingCancel = cancelAmount;
 		for (PointUsage usage : usages) {
 			if (remainingCancel <= 0) break;
+			if (usage.getRestorableAmount() <= 0) continue;
 
-			Long restoreAmount = Math.min(usage.getAmount(), remainingCancel);
+			Long restoreAmount = Math.min(usage.getRestorableAmount(), remainingCancel);
 			PointEarn point = pointEarnRepository.findById(usage.getPointId())
 					.orElseThrow(() -> new BusinessException(Result.POINT_NOT_FOUND));
 
@@ -160,6 +164,7 @@ public class PointService {
 				point.restore(restoreAmount);
 			}
 
+			usage.restore(restoreAmount);
 			remainingCancel -= restoreAmount;
 		}
 	}
@@ -187,6 +192,10 @@ public class PointService {
 					.amount(deductAmount)
 					.build());
 			remainingAmount -= deductAmount;
+		}
+
+		if (remainingAmount > 0) {
+			throw new BusinessException(Result.INSUFFICIENT_POINT);
 		}
 	}
 

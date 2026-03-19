@@ -33,6 +33,9 @@ public class PointUsage {
 	@Column(nullable = false)
 	private Long amount;
 
+	@Column(nullable = false)
+	private Long restoredAmount = 0L;
+
 	@CreatedDate
 	@Column(updatable = false)
 	private LocalDateTime createdAt;
@@ -42,5 +45,14 @@ public class PointUsage {
 		this.transactionId = transactionId;
 		this.pointId = pointId;
 		this.amount = amount;
+		this.restoredAmount = 0L;
+	}
+
+	public Long getRestorableAmount() {
+		return this.amount - this.restoredAmount;
+	}
+
+	public void restore(Long amount) {
+		this.restoredAmount += amount;
 	}
 }

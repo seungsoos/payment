@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS point_usage (
     transaction_id      BIGINT          NOT NULL,
     point_id            BIGINT          NOT NULL,
     amount              BIGINT          NOT NULL,
+    restored_amount     BIGINT          NOT NULL DEFAULT 0,
     created_at          TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_usage_transaction FOREIGN KEY (transaction_id) REFERENCES point_transaction(id),
     CONSTRAINT fk_usage_point FOREIGN KEY (point_id) REFERENCES point_earn(id)

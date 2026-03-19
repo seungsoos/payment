@@ -27,4 +27,9 @@ public class PointController {
 	public PointUseResponse use(@RequestBody @Valid PointUseRequest request) {
 		return pointService.use(request);
 	}
+
+	@PostMapping("/use/cancel")
+	public PointUseCancelResponse useCancel(@RequestBody @Valid PointUseCancelRequest request) {
+		return pointService.useCancel(request);
+	}
 }

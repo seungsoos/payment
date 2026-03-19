@@ -1,8 +1,9 @@
 package com.musinsa.payment.point.service;
 
 import com.musinsa.payment.common.exception.BusinessException;
-import org.springframework.dao.DataIntegrityViolationException;
 import com.musinsa.payment.common.exception.Result;
+import com.musinsa.payment.common.idempotency.Idempotent;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.musinsa.payment.point.dto.*;
 import com.musinsa.payment.point.entity.*;
 import com.musinsa.payment.point.repository.*;
@@ -27,14 +28,9 @@ public class PointService {
 	private final PointUsageRepository pointUsageRepository;
 	private final PointValidator pointValidator;
 
+	@Idempotent(keyExpression = "#request.idempotencyKey()")
 	@Transactional
 	public PointEarnResponse earn(PointEarnRequest request) {
-		// 멱등성 체크
-		PointEarnResponse duplicated = checkIdempotency(request);
-		if (duplicated != null) {
-			return duplicated;
-		}
-
 		// 검증
 		pointValidator.validateExpireDays(request.expireDays());
 		pointValidator.validateEarnAmount(request.amount());
@@ -79,14 +75,9 @@ public class PointService {
 		return PointEarnCancelResponse.of(point, request.memberId(), wallet.getTotalBalance());
 	}
 
+	@Idempotent(keyExpression = "#request.idempotencyKey()")
 	@Transactional
 	public PointUseResponse use(PointUseRequest request) {
-		// 멱등성 체크
-		PointUseResponse duplicated = checkUseIdempotency(request);
-		if (duplicated != null) {
-			return duplicated;
-		}
-
 		// 지갑 조회 + 락
 		PointWallet wallet = getWalletWithLock(request.memberId());
 
@@ -105,6 +96,91 @@ public class PointService {
 
 		return PointUseResponse.of(pointKey, request.memberId(), request.amount(),
 				request.orderId(), wallet.getTotalBalance(), transaction.getCreatedAt());
+	}
+
+	@Idempotent(keyExpression = "#request.idempotencyKey()")
+	@Transactional
+	public PointUseCancelResponse useCancel(PointUseCancelRequest request) {
+		// 지갑 조회 + 락
+		PointWallet wallet = getWalletWithLock(request.memberId());
+
+		// 원래 사용 거래 조회
+		PointTransaction useTransaction = pointTransactionRepository.findByPointKey(request.pointKey())
+				.orElseThrow(() -> new BusinessException(Result.USE_TRANSACTION_NOT_FOUND));
+
+		// 취소 가능 금액 검증
+		Long alreadyCancelled = getAlreadyCancelledAmount(request.pointKey());
+		Long cancellableAmount = useTransaction.getAmount() - alreadyCancelled;
+		if (request.cancelAmount() > cancellableAmount) {
+			throw new BusinessException(Result.EXCEED_CANCEL_AMOUNT);
+		}
+
+		// 거래 이력 생성
+		String pointKey = generatePointKey();
+		PointTransaction cancelTransaction = pointTransactionRepository.save(PointTransaction.builder()
+				.walletId(wallet.getId())
+				.pointKey(pointKey)
+				.type(TransactionType.USE_CANCEL)
+				.amount(request.cancelAmount())
+				.orderId(useTransaction.getOrderId())
+				.relatedPointKey(request.pointKey())
+				.idempotencyKey(request.idempotencyKey())
+				.build());
+
+		// 사용-적립 매핑 기반으로 복원 처리
+		restoreEarnPoints(wallet, useTransaction, request.cancelAmount());
+
+		// 지갑 잔액 복원
+		wallet.addBalance(request.cancelAmount());
+
+		log.info("포인트 사용취소 완료 - memberId: {}, pointKey: {}, cancelAmount: {}, balance: {}",
+				request.memberId(), pointKey, request.cancelAmount(), wallet.getTotalBalance());
+
+		return PointUseCancelResponse.of(pointKey, request.memberId(), request.cancelAmount(),
+				wallet.getTotalBalance(), cancelTransaction.getCreatedAt());
+	}
+
+	private void restoreEarnPoints(PointWallet wallet, PointTransaction useTransaction, Long cancelAmount) {
+		List<PointUsage> usages = pointUsageRepository.findByTransactionId(useTransaction.getId());
+
+		Long remainingCancel = cancelAmount;
+		for (PointUsage usage : usages) {
+			if (remainingCancel <= 0) break;
+
+			Long restoreAmount = Math.min(usage.getAmount(), remainingCancel);
+			PointEarn point = pointEarnRepository.findById(usage.getPointId())
+					.orElseThrow(() -> new BusinessException(Result.POINT_NOT_FOUND));
+
+			if (point.isExpired()) {
+				// 만료된 적립건은 신규적립 처리
+				PointEarn newPoint = pointEarnRepository.save(PointEarn.builder()
+						.walletId(wallet.getId())
+						.pointKey(generatePointKey())
+						.earnedAmount(restoreAmount)
+						.earnType(point.getEarnType())
+						.expiresAt(LocalDateTime.now().plusDays(365))
+						.build());
+
+				pointTransactionRepository.save(PointTransaction.builder()
+						.walletId(wallet.getId())
+						.pointKey(newPoint.getPointKey())
+						.type(TransactionType.EARN)
+						.amount(restoreAmount)
+						.build());
+			} else {
+				// 유효한 적립건은 잔액 복원
+				point.restore(restoreAmount);
+			}
+
+			remainingCancel -= restoreAmount;
+		}
+	}
+
+	private Long getAlreadyCancelledAmount(String usePointKey) {
+		return pointTransactionRepository.findByRelatedPointKeyAndType(usePointKey, TransactionType.USE_CANCEL)
+				.stream()
+				.mapToLong(PointTransaction::getAmount)
+				.sum();
 	}
 
 	private PointTransaction createUseTransaction(PointWallet wallet, String pointKey, PointUseRequest request) {
@@ -137,24 +213,8 @@ public class PointService {
 		}
 	}
 
-	private PointUseResponse checkUseIdempotency(PointUseRequest request) {
-		return pointTransactionRepository.findByIdempotencyKey(request.idempotencyKey())
-				.map(existing -> {
-					log.info("멱등성 키 중복 - idempotencyKey: {}", request.idempotencyKey());
-					PointWallet wallet = getWallet(request.memberId());
-					return PointUseResponse.of(existing.getPointKey(), request.memberId(), existing.getAmount(),
-							existing.getOrderId(), wallet.getTotalBalance(), existing.getCreatedAt());
-				})
-				.orElse(null);
-	}
-
 	private PointWallet getWalletWithLock(Long memberId) {
 		return pointWalletRepository.findByMemberIdWithLock(memberId)
-				.orElseThrow(() -> new BusinessException(Result.MEMBER_NOT_FOUND));
-	}
-
-	private PointWallet getWallet(Long memberId) {
-		return pointWalletRepository.findByMemberId(memberId)
 				.orElseThrow(() -> new BusinessException(Result.MEMBER_NOT_FOUND));
 	}
 
@@ -171,18 +231,6 @@ public class PointService {
 				.amount(point.getEarnedAmount())
 				.relatedPointKey(request.pointKey())
 				.build());
-	}
-
-	private PointEarnResponse checkIdempotency(PointEarnRequest request) {
-		return pointTransactionRepository.findByIdempotencyKey(request.idempotencyKey())
-				.map(existing -> {
-					log.info("멱등성 키 중복 - idempotencyKey: {}", request.idempotencyKey());
-					PointEarn point = getPointEarn(existing.getPointKey());
-					PointWallet wallet = pointWalletRepository.findByMemberId(request.memberId())
-							.orElseThrow(() -> new BusinessException(Result.MEMBER_NOT_FOUND));
-					return PointEarnResponse.of(point, request.memberId(), wallet.getTotalBalance());
-				})
-				.orElse(null);
 	}
 
 	private PointEarn createPoint(PointWallet wallet, String pointKey, PointEarnRequest request) {

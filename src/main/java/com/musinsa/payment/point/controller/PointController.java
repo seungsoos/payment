@@ -1,5 +1,7 @@
 package com.musinsa.payment.point.controller;
 
+import com.musinsa.payment.point.dto.PointEarnCancelRequest;
+import com.musinsa.payment.point.dto.PointEarnCancelResponse;
 import com.musinsa.payment.point.dto.PointEarnRequest;
 import com.musinsa.payment.point.dto.PointEarnResponse;
 import com.musinsa.payment.point.service.PointService;
@@ -17,5 +19,10 @@ public class PointController {
 	@PostMapping("/earn")
 	public PointEarnResponse earn(@RequestBody @Valid PointEarnRequest request) {
 		return pointService.earn(request);
+	}
+
+	@PostMapping("/earn/cancel")
+	public PointEarnCancelResponse earnCancel(@RequestBody @Valid PointEarnCancelRequest request) {
+		return pointService.earnCancel(request);
 	}
 }

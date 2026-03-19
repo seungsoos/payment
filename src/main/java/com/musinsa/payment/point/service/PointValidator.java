@@ -2,9 +2,7 @@ package com.musinsa.payment.point.service;
 
 import com.musinsa.payment.common.exception.BusinessException;
 import com.musinsa.payment.common.exception.Result;
-import com.musinsa.payment.point.entity.PolicyKey;
-import com.musinsa.payment.point.entity.PointPolicy;
-import com.musinsa.payment.point.entity.PointWallet;
+import com.musinsa.payment.point.entity.*;
 import com.musinsa.payment.point.repository.PointPolicyRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -34,6 +32,12 @@ public class PointValidator {
 		Long maxHoldAmount = getPolicyValue(PolicyKey.MAX_HOLD_AMOUNT);
 		if (wallet.getTotalBalance() + amount > maxHoldAmount) {
 			throw new BusinessException(Result.EXCEED_MAX_HOLD_AMOUNT);
+		}
+	}
+
+	public void validateEarnCancellable(PointEarn point) {
+		if (point.hasBeenUsed()) {
+			throw new BusinessException(Result.POINT_ALREADY_USED);
 		}
 	}
 

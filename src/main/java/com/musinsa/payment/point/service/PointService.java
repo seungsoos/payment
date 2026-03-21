@@ -108,9 +108,12 @@ public class PointService {
 		PointWallet wallet = getWalletWithLock(request.memberId());
 		checkIdempotencyAfterLock(request.idempotencyKey());
 
-		// 원래 사용 거래 조회
-		PointTransaction useTransaction = pointTransactionRepository.findByPointKey(request.pointKey())
+		// 원래 사용 거래 조회 + 소유자 검증
+		PointTransaction useTransaction = pointTransactionRepository.findByPointKeyAndType(request.pointKey(), TransactionType.USE)
 				.orElseThrow(() -> new BusinessException(Result.USE_TRANSACTION_NOT_FOUND));
+		if (!useTransaction.getWalletId().equals(wallet.getId())) {
+			throw new BusinessException(Result.USE_TRANSACTION_NOT_FOUND);
+		}
 
 		// 취소 가능 금액 검증
 		Long alreadyCancelled = getAlreadyCancelledAmount(request.pointKey());

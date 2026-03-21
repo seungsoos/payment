@@ -11,7 +11,7 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
 
 	Optional<PointTransaction> findByIdempotencyKey(String idempotencyKey);
 
-	Optional<PointTransaction> findByPointKey(String pointKey);
+	Optional<PointTransaction> findByPointKeyAndType(String pointKey, TransactionType type);
 
 	List<PointTransaction> findByRelatedPointKeyAndType(String relatedPointKey, TransactionType type);
 }

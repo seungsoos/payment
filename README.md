@@ -69,6 +69,7 @@
 | pointKey | O | 취소할 적립건의 고유 식별자 (멱등성 보장) |
 
 - 적립한 금액 중 일부라도 사용된 경우 취소 불가
+- 만료된 포인트는 적립취소 불가
 - 동일 pointKey로 재요청 시 기존 결과 반환 (멱등성)
 
 ### 3. 포인트 사용
@@ -177,7 +178,7 @@ src/main/java/com/musinsa/payment/
 │   ├── dto/             요청/응답 DTO
 │   ├── entity/          도메인 엔티티
 │   ├── repository/      데이터 접근
-│   └── service/         비즈니스 로직 (PointService, PointValidator)
+│   └── service/         비즈니스 로직 (PointService, PointValidator, PointExpireScheduler)
 └── PaymentApplication.java
 
 src/main/resources/

@@ -73,6 +73,9 @@ public class PointEarn extends BaseEntity {
 	}
 
 	public void cancel() {
+		if (isExpired()) {
+			throw new BusinessException(Result.POINT_ALREADY_EXPIRED);
+		}
 		if (this.remainingAmount < this.earnedAmount) {
 			throw new BusinessException(Result.POINT_ALREADY_USED);
 		}

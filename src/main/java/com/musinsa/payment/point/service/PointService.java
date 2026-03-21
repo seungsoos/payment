@@ -67,8 +67,8 @@ public class PointService {
 		}
 
 		// 적립취소 처리
-		wallet.deductBalance(point.getEarnedAmount());
 		point.cancel();
+		wallet.deductBalance(point.getEarnedAmount());
 		createTransaction(wallet.getId(), generatePointKey(), TransactionType.EARN_CANCEL, point.getEarnedAmount(), null, request.pointKey(), null);
 
 		log.info("포인트 적립취소 완료 - memberId: {}, pointKey: {}, amount: {}, balance: {}",
